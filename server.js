@@ -8,54 +8,46 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Fast2SMS API Key (Store this in .env file)
 const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
 
-// Function to send SMS using Fast2SMS
-async function sendSMS(phone, message) {
+async function sendSMS(number, message) {
     try {
-        const response = await axios.post("https://www.fast2sms.com/dev/bulkV2", 
-            new URLSearchParams({
-                route: "otp",
-                numbers: phone,
+        const response = await axios.post(
+            "https://www.fast2sms.com/dev/bulkV2",
+            {
+                route: "v3",
+                sender_id: "TXTIND",
                 message: message,
-                sender_id: "TXTIND"
-            }).toString(),
+                language: "english",
+                numbers: number,
+            },
             {
                 headers: {
                     "authorization": FAST2SMS_API_KEY,
-                    "Content-Type": "application/x-www-form-urlencoded"
-                }
+                    "Content-Type": "application/json",
+                },
             }
         );
         return response.data;
     } catch (error) {
-        console.error("SMS sending failed:", error.response ? error.response.data : error.message);
-        throw new Error("Failed to send SMS");
+        console.error("Error sending SMS:", error);
+        return null;
     }
 }
 
-// API Endpoint to handle referral submissions
 app.post("/send-sms", async (req, res) => {
     const { user, friends } = req.body;
-    
-    if (!user || !friends || friends.length !== 3) {
-        return res.status(400).json({ error: "Invalid data submitted" });
-    }
 
     try {
-        // Generate a unique referral code
-        let referralCode = "DRK" + Math.floor(100000 + Math.random() * 900000);
-
         // Send SMS to User
-        await sendSMS(user.phone, `Hello ${user.name}, your referral code is: ${referralCode}`);
+        await sendSMS(user.phone, `Hello ${user.name}, your referral code is: ${user.code}`);
 
         // Send SMS to Friends
         for (let friend of friends) {
-            await sendSMS(friend.phone, `Your friend referred you! Use this code: ${referralCode}`);
+            await sendSMS(friend.phone, `Your friend referred you! Use this code: ${friend.code}`);
         }
 
-        res.status(200).json({ message: "SMS sent successfully!", referralCode: referralCode });
+        res.status(200).json({ message: "SMS sent successfully!" });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
